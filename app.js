@@ -1,217 +1,423 @@
-
-(() => {
-  const $ = id => document.getElementById(id);
-  const products = window.PRODUCTS || [];
+document.addEventListener("DOMContentLoaded", () => {
   const config = window.STORE_CONFIG || {};
+  const products = window.PRODUCTS || [];
+
+  const $ = (id) => document.getElementById(id);
+
+  const searchInput = $("searchInput");
+  const categoryFilter = $("categoryFilter");
+  const sortFilter = $("sortFilter");
+  const productGrid = $("productGrid");
+  const emptyState = $("emptyState");
+
+  const cartCount = $("cartCount");
+  const cartItems = $("cartItems");
+  const cartSubtotal = $("cartSubtotal");
+  const cartDrawer = $("cartDrawer");
+  const drawerBackdrop = $("drawerBackdrop");
+  const cartOpen = $("cartOpen");
+  const cartClose = $("cartClose");
+  const checkoutButton = $("checkoutButton");
+  const checkoutError = $("checkoutError");
+
+  const customerName = $("customerName");
+  const customerPhone = $("customerPhone");
+  const customerAddress = $("customerAddress");
+  const paymentMethod = $("paymentMethod");
+
+  const money = (amount) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: config.currency || "INR",
+      maximumFractionDigits: 0
+    }).format(amount);
+
+  // Cart format: { productId: quantity }
   let cart = {};
 
   try {
-    cart = JSON.parse(localStorage.getItem("otakushelf-cart") || "{}");
+    cart = JSON.parse(localStorage.getItem("otakushelf-cart")) || {};
   } catch {
     cart = {};
   }
 
-  const money = n => new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0
-  }).format(n);
-
-  const safe = value => String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;",
-    '"': "&quot;", "'": "&#39;"
-  }[c]));
-
-  const getProduct = id => products.find(p => p.id === id);
-  const quantity = () => Object.values(cart).reduce((a, n) => a + n, 0);
-  const subtotal = () => Object.entries(cart).reduce(
-    (sum, [id, n]) => sum + (getProduct(id)?.price || 0) * n, 0
-  );
-
   function saveCart() {
-    try {
-      localStorage.setItem("otakushelf-cart", JSON.stringify(cart));
-    } catch {}
+    localStorage.setItem("otakushelf-cart", JSON.stringify(cart));
+  }
+
+  function getProduct(id) {
+    return products.find((product) => product.id === id);
+  }
+
+  function getCartQuantity(id) {
+    return Number(cart[id]) || 0;
+  }
+
+  function getCartTotal() {
+    return Object.entries(cart).reduce((total, [id, quantity]) => {
+      const product = getProduct(id);
+      return product
+        ? total + product.price * quantity
+        : total;
+    }, 0);
+  }
+
+  function getCartCount() {
+    return Object.values(cart).reduce(
+      (total, quantity) => total + (Number(quantity) || 0),
+      0
+    );
+  }
+
+  function escapeHTML(value = "") {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[character]);
+  }
+
+  function populateGenres() {
+    if (!categoryFilter) return;
+
+    const genres = [
+      ...new Set(
+        products.flatMap((product) =>
+          product.genres || [product.category].filter(Boolean)
+        )
+      )
+    ].sort((a, b) => a.localeCompare(b));
+
+    categoryFilter.innerHTML =
+      '<option value="">All genres</option>' +
+      genres.map((genre) =>
+        `<option value="${escapeHTML(genre)}">${escapeHTML(genre)}</option>`
+      ).join("");
+  }
+
+  function getFilteredProducts() {
+    const search = (searchInput?.value || "")
+      .trim()
+      .toLowerCase();
+
+    const genre = categoryFilter?.value || "";
+    const sort = sortFilter?.value || "";
+
+    let result = products.filter((product) => {
+      const searchableText = [
+        product.title,
+        product.series,
+        product.author,
+        product.illustrator,
+        product.publisher,
+        product.isbn,
+        product.category,
+        ...(product.genres || [])
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      const matchesSearch = searchableText.includes(search);
+
+      const productGenres =
+        product.genres || [product.category].filter(Boolean);
+
+      const matchesGenre = !genre || productGenres.includes(genre);
+
+      return matchesSearch && matchesGenre;
+    });
+
+    if (sort === "price-low") {
+      result.sort((a, b) => a.price - b.price);
+    } else if (sort === "price-high") {
+      result.sort((a, b) => b.price - a.price);
+    } else if (sort === "name") {
+      result.sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    return result;
   }
 
   function renderProducts() {
-    const query = $("searchInput").value.trim().toLowerCase();
-    const category = $("categoryFilter").value;
-    const sort = $("sortFilter").value;
+    if (!productGrid) return;
 
-    let list = products.filter(p =>
-      (category === "all" || p.category === category) &&
-      `${p.title} ${p.author} ${p.category}`.toLowerCase().includes(query)
-    );
+    const filteredProducts = getFilteredProducts();
 
-    if (sort === "low") list.sort((a, b) => a.price - b.price);
-    if (sort === "high") list.sort((a, b) => b.price - a.price);
+    if (emptyState) {
+      emptyState.hidden = filteredProducts.length !== 0;
+    }
 
-    $("productGrid").innerHTML = list.map(p => `
-      <article class="product-card">
-        <div class="product-art" style="background:radial-gradient(circle,${safe(p.colors[0])},${safe(p.colors[1])})">
-          <div class="book-cover" style="background:linear-gradient(145deg,${safe(p.colors[0])},${safe(p.colors[1])})">
-            <small>${safe(config.storeName || "OTAKUSHELF")}</small>
-            <span class="symbol">${safe(p.icon || "✦")}</span>
-            <strong>${safe(p.title)}</strong>
-            <small>BOOK • MANGA • STORY</small>
-          </div>
-        </div>
-        <div class="product-info">
-          <span class="category">${safe(p.category)}</span>
-          <h3>${safe(p.title)}</h3>
-          <p class="author">${safe(p.author)}</p>
-          <div class="product-bottom">
-            <strong>${money(p.price)}</strong>
-            <button class="add-button" data-add="${safe(p.id)}" ${p.stock < 1 ? "disabled" : ""}>
-              ${p.stock < 1 ? "Sold out" : "Add to cart +"}
+    productGrid.innerHTML = filteredProducts.map((product) => {
+      const genres = product.genres || [product.category].filter(Boolean);
+      const outOfStock = Number(product.stock) <= 0;
+
+      const imageHTML = product.image
+        ? `<img
+            class="real-book-cover"
+            src="${escapeHTML(product.image)}"
+            alt="${escapeHTML(product.title)} cover"
+            loading="lazy"
+            onerror="this.style.display='none';this.nextElementSibling.hidden=false"
+          >
+          <div class="book-cover-placeholder" hidden>
+            <span>${escapeHTML(product.series || product.title)}</span>
+            <small>Cover unavailable</small>
+          </div>`
+        : `<div class="book-cover-placeholder">
+            <span>${escapeHTML(product.series || product.title)}</span>
+            <small>Cover unavailable</small>
+          </div>`;
+
+      return `
+        <article class="product-card">
+          <a
+            class="product-image-link"
+            href="${escapeHTML(product.productUrl || "#")}"
+            ${product.productUrl ? 'target="_blank" rel="noopener noreferrer"' : ""}
+            aria-label="View ${escapeHTML(product.title)} details"
+          >
+            <div class="product-image">${imageHTML}</div>
+          </a>
+
+          <div class="product-info">
+            <div class="product-genres">
+              ${genres.map((item) =>
+                `<span>${escapeHTML(item)}</span>`
+              ).join("")}
+            </div>
+
+            <h3>${escapeHTML(product.title)}</h3>
+
+            <p class="product-author">
+              By ${escapeHTML(product.author || "Author not listed")}
+            </p>
+
+            ${product.illustrator ? `
+              <p class="product-detail">
+                Illustrator: ${escapeHTML(product.illustrator)}
+              </p>` : ""}
+
+            ${product.volume ? `
+              <p class="product-detail">
+                Volume ${escapeHTML(product.volume)}
+              </p>` : ""}
+
+            ${product.isbn ? `
+              <p class="product-detail">
+                ISBN: ${escapeHTML(product.isbn)}
+              </p>` : ""}
+
+            <div class="product-price">${money(product.price)}</div>
+
+            <p class="stock-status">
+              ${outOfStock ? "Out of stock" : `${product.stock} available`}
+            </p>
+
+            <button
+              class="add-to-cart"
+              data-add="${escapeHTML(product.id)}"
+              ${outOfStock ? "disabled" : ""}
+            >
+              ${outOfStock ? "Out of stock" : "Add to cart"}
             </button>
           </div>
-        </div>
-      </article>
-    `).join("");
-
-    $("emptyState").hidden = list.length > 0;
+        </article>
+      `;
+    }).join("");
   }
 
   function renderCart() {
-    $("cartCount").textContent = quantity();
-    const entries = Object.entries(cart).filter(([id, n]) => getProduct(id) && n > 0);
+    if (cartCount) {
+      cartCount.textContent = getCartCount();
+    }
 
-    $("cartItems").innerHTML = entries.length ? entries.map(([id, n]) => {
-      const p = getProduct(id);
+    if (cartSubtotal) {
+      cartSubtotal.textContent = money(getCartTotal());
+    }
+
+    if (!cartItems) return;
+
+    const entries = Object.entries(cart)
+      .filter(([id, quantity]) => getProduct(id) && quantity > 0);
+
+    if (!entries.length) {
+      cartItems.innerHTML = "<p>Your cart is empty.</p>";
+      return;
+    }
+
+    cartItems.innerHTML = entries.map(([id, quantity]) => {
+      const product = getProduct(id);
+
       return `
-        <div class="cart-line">
-          <strong>${safe(p.title)}</strong>
-          <p>${money(p.price)} each</p>
-          <div class="quantity-controls">
-            <button data-qty="${safe(id)}" data-delta="-1">−</button>
-            <span>${n}</span>
-            <button data-qty="${safe(id)}" data-delta="1" ${n >= p.stock ? "disabled" : ""}>+</button>
-            <button data-remove="${safe(id)}">Remove</button>
+        <div class="cart-item">
+          <div class="cart-item-info">
+            <strong>${escapeHTML(product.title)}</strong>
+            <span>${money(product.price)} each</span>
+            <span>Subtotal: ${money(product.price * quantity)}</span>
           </div>
+
+          <div class="cart-quantity">
+            <button data-change="${escapeHTML(id)}" data-delta="-1"
+              aria-label="Decrease quantity">−</button>
+            <span>${quantity}</span>
+            <button data-change="${escapeHTML(id)}" data-delta="1"
+              aria-label="Increase quantity"
+              ${quantity >= product.stock ? "disabled" : ""}>+</button>
+          </div>
+
+          <button class="remove-item" data-remove="${escapeHTML(id)}">
+            Remove
+          </button>
         </div>
       `;
-    }).join("") : "<p>Your cart is empty.</p>";
+    }).join("");
+  }
 
-    $("cartSubtotal").textContent = money(subtotal());
+  function addToCart(id) {
+    const product = getProduct(id);
+    if (!product) return;
+
+    const currentQuantity = getCartQuantity(id);
+
+    if (currentQuantity >= Number(product.stock)) {
+      alert("You cannot add more than the available stock.");
+      return;
+    }
+
+    cart[id] = currentQuantity + 1;
+    saveCart();
+    renderCart();
+  }
+
+  function changeQuantity(id, delta) {
+    const product = getProduct(id);
+    if (!product) return;
+
+    const nextQuantity = getCartQuantity(id) + delta;
+
+    if (nextQuantity <= 0) {
+      delete cart[id];
+    } else if (nextQuantity <= Number(product.stock)) {
+      cart[id] = nextQuantity;
+    }
+
+    saveCart();
+    renderCart();
+  }
+
+  function removeFromCart(id) {
+    delete cart[id];
+    saveCart();
+    renderCart();
   }
 
   function openCart() {
-    $("cartDrawer").classList.add("open");
-    $("cartDrawer").setAttribute("aria-hidden", "false");
-    $("drawerBackdrop").hidden = false;
+    cartDrawer?.classList.add("is-open");
+    drawerBackdrop?.classList.add("is-visible");
+    cartDrawer?.setAttribute("aria-hidden", "false");
   }
 
   function closeCart() {
-    $("cartDrawer").classList.remove("open");
-    $("cartDrawer").setAttribute("aria-hidden", "true");
-    $("drawerBackdrop").hidden = true;
+    cartDrawer?.classList.remove("is-open");
+    drawerBackdrop?.classList.remove("is-visible");
+    cartDrawer?.setAttribute("aria-hidden", "true");
   }
 
-  $("productGrid").addEventListener("click", e => {
-    const button = e.target.closest("[data-add]");
-    if (!button) return;
+  function checkout() {
+    if (checkoutError) checkoutError.textContent = "";
 
-    const p = getProduct(button.dataset.add);
-    if (!p || p.stock < 1) return;
+    const items = Object.entries(cart)
+      .filter(([id, quantity]) => getProduct(id) && quantity > 0);
 
-    const next = (cart[p.id] || 0) + 1;
-    if (next > p.stock) {
-      alert("The selected quantity exceeds available sample stock.");
+    if (!items.length) {
+      if (checkoutError) checkoutError.textContent = "Your cart is empty.";
       return;
     }
 
-    cart[p.id] = next;
-    saveCart();
-    renderCart();
-    button.textContent = "Added ✓";
-  });
-
-  $("cartItems").addEventListener("click", e => {
-    const qButton = e.target.closest("[data-qty]");
-    const removeButton = e.target.closest("[data-remove]");
-
-    if (removeButton) delete cart[removeButton.dataset.remove];
-
-    if (qButton) {
-      const id = qButton.dataset.qty;
-      const next = (cart[id] || 0) + Number(qButton.dataset.delta);
-      const p = getProduct(id);
-
-      if (next <= 0) delete cart[id];
-      else if (p && next <= p.stock) cart[id] = next;
-    }
-
-    saveCart();
-    renderCart();
-  });
-
-  $("cartOpen").addEventListener("click", openCart);
-  $("cartClose").addEventListener("click", closeCart);
-  $("drawerBackdrop").addEventListener("click", closeCart);
-
-  ["searchInput", "categoryFilter", "sortFilter"].forEach(id => {
-    $(id).addEventListener(id === "searchInput" ? "input" : "change", renderProducts);
-  });
-
-  $("checkoutButton").addEventListener("click", () => {
-    $("checkoutError").textContent = "";
-
-    const entries = Object.entries(cart).filter(([id, n]) => getProduct(id) && n > 0);
-    const name = $("customerName").value.trim();
-    const phone = $("customerPhone").value.trim();
-    const address = $("customerAddress").value.trim();
-    const payment = $("paymentMethod").value;
-
-    if (!entries.length) {
-      $("checkoutError").textContent = "Your cart is empty.";
-      return;
-    }
+    const name = customerName?.value.trim() || "";
+    const phone = customerPhone?.value.trim() || "";
+    const address = customerAddress?.value.trim() || "";
 
     if (!name || !phone || !address) {
-      $("checkoutError").textContent = "Enter your name, phone number and delivery address.";
+      if (checkoutError) {
+        checkoutError.textContent =
+          "Enter your name, phone number and delivery address.";
+      }
       return;
     }
 
-    if (phone.replace(/\D/g, "").length < 10) {
-      $("checkoutError").textContent = "Enter a valid phone number.";
+    const orderLines = items.map(([id, quantity]) => {
+      const product = getProduct(id);
+      return `${product.title} x ${quantity} = ${money(product.price * quantity)}`;
+    });
+
+    const message = [
+      `New order request — ${config.storeName || "OtakuShelf"}`,
+      "",
+      `Customer: ${name}`,
+      `Phone: ${phone}`,
+      `Address: ${address}`,
+      `Payment preference: ${paymentMethod?.value || "Not selected"}`,
+      "",
+      "Items:",
+      ...orderLines,
+      "",
+      `Subtotal: ${money(getCartTotal())}`,
+      "",
+      "Please confirm stock, delivery charges and final total."
+    ].join("\n");
+
+    const whatsappNumber = String(config.whatsappNumber || "")
+      .replace(/\D/g, "");
+
+    if (!whatsappNumber || whatsappNumber.endsWith("XXXXXXXXXX")) {
+      if (checkoutError) {
+        checkoutError.textContent =
+          "Store owner: configure your WhatsApp number in products.js first.";
+      }
       return;
     }
 
-    const lines = entries.map(([id, n]) =>
-      `• ${getProduct(id).title} × ${n} — ${money(getProduct(id).price * n)}`
-    ).join("\n");
+    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 
-    const message = `${config.storeName || "OtakuShelf"} — ORDER REQUEST
-
-Customer: ${name}
-Phone: ${phone}
-Delivery address: ${address}
-
-Items:
-${lines}
-
-Subtotal (shipping excluded): ${money(subtotal())}
-Preferred payment: ${payment}
-
-Please confirm stock, delivery cost, final total and payment instructions.`;
-
-    const whatsapp = String(config.whatsappNumber || "").replace(/\D/g, "");
-
-    if (!whatsapp || whatsapp.includes("XXXXXXXXXX") || whatsapp.length < 10) {
-      $("checkoutError").textContent = "Add your WhatsApp number in products.js first.";
-      return;
-    }
-
-    window.open(
-      `https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`,
-      "_blank"
-    );
+  // Product-grid event delegation
+  productGrid?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-add]");
+    if (button) addToCart(button.dataset.add);
   });
 
-  $("year").textContent = new Date().getFullYear();
+  cartItems?.addEventListener("click", (event) => {
+    const changeButton = event.target.closest("[data-change]");
+    const removeButton = event.target.closest("[data-remove]");
+
+    if (changeButton) {
+      changeQuantity(
+        changeButton.dataset.change,
+        Number(changeButton.dataset.delta)
+      );
+    }
+
+    if (removeButton) {
+      removeFromCart(removeButton.dataset.remove);
+    }
+  });
+
+  searchInput?.addEventListener("input", renderProducts);
+  categoryFilter?.addEventListener("change", renderProducts);
+  sortFilter?.addEventListener("change", renderProducts);
+
+  cartOpen?.addEventListener("click", openCart);
+  cartClose?.addEventListener("click", closeCart);
+  drawerBackdrop?.addEventListener("click", closeCart);
+  checkoutButton?.addEventListener("click", checkout);
+
+  const year = $("year");
+  if (year) year.textContent = new Date().getFullYear();
+
+  populateGenres();
   renderProducts();
   renderCart();
-})();
+});
       
