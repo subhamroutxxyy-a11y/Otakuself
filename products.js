@@ -1,59 +1,178 @@
 
-window.STORE_CONFIG = {
+const STORE_CONFIG = {
   storeName: "OtakuShelf",
   whatsappNumber: "91XXXXXXXXXX",
-  contactEmail: "hello@example.com"
+  contactEmail: "hello@example.com",
+  currency: "INR"
 };
 
-window.PRODUCTS = [
+const PRODUCTS = [
   {
-    id: "manga-001",
-    title: "Manga Volume One",
-    author: "Add author / series",
-    category: "Manga",
-    price: 299,
-    stock: 8,
-    icon: "月",
-    colors: ["#a34263", "#27172b"]
-  },
-  {
-    id: "manga-002",
-    title: "The Shadow Hero",
-    author: "Add author / series",
-    category: "Manga",
-    price: 349,
+    id: "jjk-vol-1",
+    title: "Jujutsu Kaisen, Vol. 1",
+    series: "Jujutsu Kaisen",
+    volume: 1,
+    author: "Gege Akutami",
+    publisher: "VIZ Media",
+    isbn: "9781974710027",
+    category: "Action",
+    genres: ["Action", "Supernatural", "Fantasy"],
+    language: "English",
+    price: 799,
     stock: 5,
-    icon: "影",
-    colors: ["#426c9c", "#16223c"]
+    image: "https://www.simonandschuster.co.in/books/Jujutsu-Kaisen-Vol-1/Gege-Akutami/Jujutsu-Kaisen/9781974710027",
+    productUrl: "https://www.simonandschuster.co.in/books/Jujutsu-Kaisen-Vol-1/Gege-Akutami/Jujutsu-Kaisen/9781974710027"
   },
   {
-    id: "novel-001",
-    title: "A Thousand Stars",
-    author: "Add author / series",
-    category: "Light Novels",
-    price: 399,
-    stock: 4,
-    icon: "✦",
-    colors: ["#bd8352", "#38243d"]
+    id: "one-piece-vol-1",
+    title: "One Piece, Vol. 1",
+    series: "One Piece",
+    volume: 1,
+    author: "Eiichiro Oda",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Adventure",
+    genres: ["Adventure", "Action", "Comedy", "Fantasy"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/one-piece",
+    productUrl: "https://www.viz.com/one-piece"
   },
   {
-    id: "art-001",
-    title: "Anime Art Collection",
-    author: "Add artist / publisher",
-    category: "Art Books",
-    price: 599,
-    stock: 3,
-    icon: "画",
-    colors: ["#578d80", "#183c43"]
+    id: "demon-slayer-vol-1",
+    title: "Demon Slayer: Kimetsu no Yaiba, Vol. 1",
+    series: "Demon Slayer",
+    volume: 1,
+    author: "Koyoharu Gotouge",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Fantasy",
+    genres: ["Action", "Fantasy", "Adventure"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/demon-slayer-kimetsu-no-yaiba",
+    productUrl: "https://www.viz.com/demon-slayer-kimetsu-no-yaiba"
   },
   {
-    id: "comic-001",
-    title: "Cosmic Guardians",
-    author: "Add author / series",
-    category: "Comics",
-    price: 249,
-    stock: 10,
-    icon: "✧",
-    colors: ["#9e4c38", "#3b1e29"]
+    id: "spy-family-vol-1",
+    title: "Spy x Family, Vol. 1",
+    series: "Spy x Family",
+    volume: 1,
+    author: "Tatsuya Endo",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Comedy",
+    genres: ["Comedy", "Action", "Slice of Life"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/spy-x-family",
+    productUrl: "https://www.viz.com/spy-x-family"
+  },
+  {
+    id: "naruto-vol-1",
+    title: "Naruto, Vol. 1",
+    series: "Naruto",
+    volume: 1,
+    author: "Masashi Kishimoto",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Adventure",
+    genres: ["Adventure", "Action", "Fantasy"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/naruto",
+    productUrl: "https://www.viz.com/naruto"
+  },
+  {
+    id: "chainsaw-man-vol-1",
+    title: "Chainsaw Man, Vol. 1",
+    series: "Chainsaw Man",
+    volume: 1,
+    author: "Tatsuki Fujimoto",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Action",
+    genres: ["Action", "Dark Fantasy", "Supernatural"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/chainsaw-man",
+    productUrl: "https://www.viz.com/chainsaw-man"
+  },
+  {
+    id: "blue-lock-vol-1",
+    title: "Blue Lock, Vol. 1",
+    series: "Blue Lock",
+    volume: 1,
+    author: "Muneyuki Kaneshiro",
+    illustrator: "Yusuke Nomura",
+    publisher: "Kodansha",
+    isbn: "",
+    category: "Sports",
+    genres: ["Sports", "Drama"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://kodansha.us/series/blue-lock/",
+    productUrl: "https://kodansha.us/series/blue-lock/"
+  },
+  {
+    id: "kaiju-no-8-vol-1",
+    title: "Kaiju No. 8, Vol. 1",
+    series: "Kaiju No. 8",
+    volume: 1,
+    author: "Naoya Matsumoto",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Science Fiction",
+    genres: ["Action", "Science Fiction", "Adventure"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/kaiju-no-8",
+    productUrl: "https://www.viz.com/kaiju-no-8"
+  },
+  {
+    id: "dandadan-vol-1",
+    title: "Dandadan, Vol. 1",
+    series: "Dandadan",
+    volume: 1,
+    author: "Yukinobu Tatsu",
+    publisher: "VIZ Media",
+    isbn: "",
+    category: "Supernatural",
+    genres: ["Supernatural", "Comedy", "Action", "Science Fiction"],
+    language: "English",
+    price: 799,
+    stock: 5,
+    image: "https://www.viz.com/dandadan",
+    productUrl: "https://www.viz.com/dandadan"
+  },
+  {
+    id: "solo-leveling-vol-1",
+    title: "Solo Leveling, Vol. 1",
+    series: "Solo Leveling",
+    volume: 1,
+    author: "Chugong",
+    illustrator: "DUBU (REDICE STUDIO)",
+    publisher: "Yen Press",
+    isbn: "",
+    category: "Fantasy",
+    genres: ["Fantasy", "Action", "Adventure"],
+    language: "English",
+    price: 999,
+    stock: 5,
+    image: "https://yenpress.com/series/solo-leveling",
+    productUrl: "https://yenpress.com/series/solo-leveling"
   }
 ];
+
+if (typeof window !== "undefined") {
+  window.STORE_CONFIG = STORE_CONFIG;
+  window.PRODUCTS = PRODUCTS;
+  }
+    
