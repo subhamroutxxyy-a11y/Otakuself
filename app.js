@@ -1,423 +1,369 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const config = window.STORE_CONFIG || {};
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
   const products = window.PRODUCTS || [];
+  const config = window.STORE_CONFIG || {};
 
-  const $ = (id) => document.getElementById(id);
+  const money = n => new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0
+  }).format(n);
 
-  const searchInput = $("searchInput");
-  const categoryFilter = $("categoryFilter");
-  const sortFilter = $("sortFilter");
-  const productGrid = $("productGrid");
-  const emptyState = $("emptyState");
+  const escapeHTML = value => String(value ?? "").replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;",
+      '"': "&quot;", "'": "&#39;"
+    })[c]
+  );
 
-  const cartCount = $("cartCount");
-  const cartItems = $("cartItems");
-  const cartSubtotal = $("cartSubtotal");
-  const cartDrawer = $("cartDrawer");
-  const drawerBackdrop = $("drawerBackdrop");
-  const cartOpen = $("cartOpen");
-  const cartClose = $("cartClose");
-  const checkoutButton = $("checkoutButton");
-  const checkoutError = $("checkoutError");
-
-  const customerName = $("customerName");
-  const customerPhone = $("customerPhone");
-  const customerAddress = $("customerAddress");
-  const paymentMethod = $("paymentMethod");
-
-  const money = (amount) =>
-    new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: config.currency || "INR",
-      maximumFractionDigits: 0
-    }).format(amount);
-
-  // Cart format: { productId: quantity }
   let cart = {};
 
   try {
-    cart = JSON.parse(localStorage.getItem("otakushelf-cart")) || {};
+    cart = JSON.parse(localStorage.getItem("otakushelf-cart") || "{}");
+    if (!cart || typeof cart !== "object" || Array.isArray(cart)) cart = {};
   } catch {
     cart = {};
   }
 
-  function saveCart() {
-    localStorage.setItem("otakushelf-cart", JSON.stringify(cart));
-  }
+  // Keep only valid product IDs and safe integer quantities.
+  cart = Object.fromEntries(
+    Object.entries(cart).filter(([id, quantity]) => {
+      const p = products.find(book => book.id === id);
+      return p && Number.isSafeInteger(quantity) &&
+        quantity > 0 && quantity <= p.stock;
+    })
+  );
 
-  function getProduct(id) {
-    return products.find((product) => product.id === id);
-  }
+  const getProduct = id => products.find(p => p.id === id);
 
-  function getCartQuantity(id) {
-    return Number(cart[id]) || 0;
-  }
+  const cartQuantity = () =>
+    Object.values(cart).reduce((sum, n) => sum + n, 0);
 
-  function getCartTotal() {
-    return Object.entries(cart).reduce((total, [id, quantity]) => {
-      const product = getProduct(id);
-      return product
-        ? total + product.price * quantity
-        : total;
+  const subtotal = () =>
+    Object.entries(cart).reduce((sum, [id, n]) => {
+      const p = getProduct(id);
+      return sum + (p ? p.price * n : 0);
     }, 0);
-  }
 
-  function getCartCount() {
-    return Object.values(cart).reduce(
-      (total, quantity) => total + (Number(quantity) || 0),
-      0
-    );
-  }
-
-  function escapeHTML(value = "") {
-    return String(value).replace(/[&<>"']/g, (character) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    })[character]);
-  }
-
-  function populateGenres() {
-    if (!categoryFilter) return;
-
-    const genres = [
-      ...new Set(
-        products.flatMap((product) =>
-          product.genres || [product.category].filter(Boolean)
-        )
-      )
-    ].sort((a, b) => a.localeCompare(b));
-
-    categoryFilter.innerHTML =
-      '<option value="">All genres</option>' +
-      genres.map((genre) =>
-        `<option value="${escapeHTML(genre)}">${escapeHTML(genre)}</option>`
-      ).join("");
-  }
-
-  function getFilteredProducts() {
-    const search = (searchInput?.value || "")
-      .trim()
-      .toLowerCase();
-
-    const genre = categoryFilter?.value || "";
-    const sort = sortFilter?.value || "";
-
-    let result = products.filter((product) => {
-      const searchableText = [
-        product.title,
-        product.series,
-        product.author,
-        product.illustrator,
-        product.publisher,
-        product.isbn,
-        product.category,
-        ...(product.genres || [])
-      ].filter(Boolean).join(" ").toLowerCase();
-
-      const matchesSearch = searchableText.includes(search);
-
-      const productGenres =
-        product.genres || [product.category].filter(Boolean);
-
-      const matchesGenre = !genre || productGenres.includes(genre);
-
-      return matchesSearch && matchesGenre;
-    });
-
-    if (sort === "price-low") {
-      result.sort((a, b) => a.price - b.price);
-    } else if (sort === "price-high") {
-      result.sort((a, b) => b.price - a.price);
-    } else if (sort === "name") {
-      result.sort((a, b) => a.title.localeCompare(b.title));
+  function saveCart() {
+    try {
+      localStorage.setItem("otakushelf-cart", JSON.stringify(cart));
+    } catch {
+      // The cart still works during this page session.
     }
+  }
 
-    return result;
+  function productCard(p) {
+    return `
+      <article class="product-card" data-product="${escapeHTML(p.id)}">
+        <div class="cover-wrap">
+          <div class="cover-placeholder" id="placeholder-${escapeHTML(p.id)}">
+            <span>漫</span>
+            <strong>${escapeHTML(p.title)}</strong>
+            <small>SEARCHING FOR COVER…</small>
+          </div>
+          <img id="cover-${escapeHTML(p.id)}"
+               alt="${escapeHTML(p.title)} book cover"
+               loading="lazy" hidden>
+        </div>
+        <div class="product-info">
+          <span class="genre-tag">${escapeHTML(p.category)}</span>
+          <h3>${escapeHTML(p.title)}</h3>
+          <p class="product-author">By ${escapeHTML(p.author)}</p>
+          <div class="product-price">${money(p.price)}</div>
+          <button class="add-button" type="button"
+                  data-add="${escapeHTML(p.id)}"
+                  ${p.stock < 1 ? "disabled" : ""}>
+            ${p.stock < 1 ? "Sold out" : "Add to bag +"}
+          </button>
+        </div>
+      </article>
+    `;
   }
 
   function renderProducts() {
-    if (!productGrid) return;
+    const query = $("searchInput").value.trim().toLowerCase();
+    const category = $("categoryFilter").value;
+    const sort = $("sortFilter").value;
 
-    const filteredProducts = getFilteredProducts();
+    let list = products.filter(p =>
+      (category === "all" || p.category === category) &&
+      `${p.title} ${p.author} ${p.category}`.toLowerCase().includes(query)
+    );
 
-    if (emptyState) {
-      emptyState.hidden = filteredProducts.length !== 0;
+    if (sort === "low") list.sort((a, b) => a.price - b.price);
+    if (sort === "high") list.sort((a, b) => b.price - a.price);
+    if (sort === "name") list.sort((a, b) => a.title.localeCompare(b.title));
+
+    $("productGrid").innerHTML = list.map(productCard).join("");
+    $("emptyState").hidden = list.length > 0;
+    $("resultsCount").textContent =
+      `${list.length} ${list.length === 1 ? "title" : "titles"} found`;
+
+    // Reuse any cover URLs already discovered.
+    list.forEach(p => {
+      if (p.image) showCover(p, p.image);
+    });
+  }
+
+  function showCover(product, url) {
+    const img = $(`cover-${product.id}`);
+    const placeholder = $(`placeholder-${product.id}`);
+    if (!img || !placeholder) return;
+
+    img.onerror = () => {
+      img.hidden = true;
+      placeholder.hidden = false;
+      placeholder.innerHTML =
+        `<span>漫</span><strong>${escapeHTML(product.title)}</strong>` +
+        `<small>Cover unavailable</small>`;
+    };
+
+    img.onload = () => {
+      img.hidden = false;
+      placeholder.hidden = true;
+    };
+
+    img.src = url;
+  }
+
+  // Look up real cover thumbnails online. Some editions may not
+  // exist in Google Books; those use the designed placeholder.
+  async function lookupCover(product) {
+    if (product.image) return;
+
+    const url = "https://www.googleapis.com/books/v1/volumes?q=" +
+      encodeURIComponent(product.query) + "&maxResults=5";
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Book search unavailable");
+
+      const data = await response.json();
+      const items = data.items || [];
+
+      const match = items.find(item => {
+        const info = item.volumeInfo || {};
+        return info.imageLinks &&
+          (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail);
+      });
+
+      if (!match) throw new Error("No cover found");
+
+      const links = match.volumeInfo.imageLinks;
+      product.image = (
+        links.thumbnail || links.smallThumbnail
+      ).replace(/^http:/, "https:").replace(/&amp;/g, "&");
+
+      showCover(product, product.image);
+    } catch {
+      const placeholder = $(`placeholder-${product.id}`);
+      if (placeholder) {
+        placeholder.innerHTML =
+          `<span>漫</span><strong>${escapeHTML(product.title)}</strong>` +
+          `<small>Cover unavailable — check another edition</small>`;
+      }
     }
+  }
 
-    productGrid.innerHTML = filteredProducts.map((product) => {
-      const genres = product.genres || [product.category].filter(Boolean);
-      const outOfStock = Number(product.stock) <= 0;
-
-      const imageHTML = product.image
-        ? `<img
-            class="real-book-cover"
-            src="${escapeHTML(product.image)}"
-            alt="${escapeHTML(product.title)} cover"
-            loading="lazy"
-            onerror="this.style.display='none';this.nextElementSibling.hidden=false"
-          >
-          <div class="book-cover-placeholder" hidden>
-            <span>${escapeHTML(product.series || product.title)}</span>
-            <small>Cover unavailable</small>
-          </div>`
-        : `<div class="book-cover-placeholder">
-            <span>${escapeHTML(product.series || product.title)}</span>
-            <small>Cover unavailable</small>
-          </div>`;
-
-      return `
-        <article class="product-card">
-          <a
-            class="product-image-link"
-            href="${escapeHTML(product.productUrl || "#")}"
-            ${product.productUrl ? 'target="_blank" rel="noopener noreferrer"' : ""}
-            aria-label="View ${escapeHTML(product.title)} details"
-          >
-            <div class="product-image">${imageHTML}</div>
-          </a>
-
-          <div class="product-info">
-            <div class="product-genres">
-              ${genres.map((item) =>
-                `<span>${escapeHTML(item)}</span>`
-              ).join("")}
-            </div>
-
-            <h3>${escapeHTML(product.title)}</h3>
-
-            <p class="product-author">
-              By ${escapeHTML(product.author || "Author not listed")}
-            </p>
-
-            ${product.illustrator ? `
-              <p class="product-detail">
-                Illustrator: ${escapeHTML(product.illustrator)}
-              </p>` : ""}
-
-            ${product.volume ? `
-              <p class="product-detail">
-                Volume ${escapeHTML(product.volume)}
-              </p>` : ""}
-
-            ${product.isbn ? `
-              <p class="product-detail">
-                ISBN: ${escapeHTML(product.isbn)}
-              </p>` : ""}
-
-            <div class="product-price">${money(product.price)}</div>
-
-            <p class="stock-status">
-              ${outOfStock ? "Out of stock" : `${product.stock} available`}
-            </p>
-
-            <button
-              class="add-to-cart"
-              data-add="${escapeHTML(product.id)}"
-              ${outOfStock ? "disabled" : ""}
-            >
-              ${outOfStock ? "Out of stock" : "Add to cart"}
-            </button>
-          </div>
-        </article>
-      `;
-    }).join("");
+  // Limit simultaneous requests so the store loads more gently.
+  async function loadCovers() {
+    let index = 0;
+    async function worker() {
+      while (index < products.length) {
+        const product = products[index++];
+        await lookupCover(product);
+      }
+    }
+    await Promise.all(Array.from({ length: 4 }, () => worker()));
   }
 
   function renderCart() {
-    if (cartCount) {
-      cartCount.textContent = getCartCount();
-    }
+    $("cartCount").textContent = cartQuantity();
 
-    if (cartSubtotal) {
-      cartSubtotal.textContent = money(getCartTotal());
-    }
+    const entries = Object.entries(cart).filter(([id, n]) =>
+      getProduct(id) && n > 0
+    );
 
-    if (!cartItems) return;
+    $("cartItems").innerHTML = entries.length
+      ? entries.map(([id, n]) => {
+          const p = getProduct(id);
+          return `
+            <div class="cart-line">
+              <div class="cart-line-top">
+                <strong>${escapeHTML(p.title)}</strong>
+                <strong>${money(p.price * n)}</strong>
+              </div>
+              <p>${money(p.price)} each</p>
+              <div class="quantity-controls">
+                <button type="button" data-qty="${escapeHTML(id)}"
+                        data-delta="-1" aria-label="Decrease quantity">−</button>
+                <span>${n}</span>
+                <button type="button" data-qty="${escapeHTML(id)}"
+                        data-delta="1" aria-label="Increase quantity"
+                        ${n >= p.stock ? "disabled" : ""}>+</button>
+                <button type="button" class="remove-button"
+                        data-remove="${escapeHTML(id)}">Remove</button>
+              </div>
+            </div>
+          `;
+        }).join("")
+      : "<p class='shipping-note'>Your bag is empty. Explore the collection to add manga.</p>";
 
-    const entries = Object.entries(cart)
-      .filter(([id, quantity]) => getProduct(id) && quantity > 0);
-
-    if (!entries.length) {
-      cartItems.innerHTML = "<p>Your cart is empty.</p>";
-      return;
-    }
-
-    cartItems.innerHTML = entries.map(([id, quantity]) => {
-      const product = getProduct(id);
-
-      return `
-        <div class="cart-item">
-          <div class="cart-item-info">
-            <strong>${escapeHTML(product.title)}</strong>
-            <span>${money(product.price)} each</span>
-            <span>Subtotal: ${money(product.price * quantity)}</span>
-          </div>
-
-          <div class="cart-quantity">
-            <button data-change="${escapeHTML(id)}" data-delta="-1"
-              aria-label="Decrease quantity">−</button>
-            <span>${quantity}</span>
-            <button data-change="${escapeHTML(id)}" data-delta="1"
-              aria-label="Increase quantity"
-              ${quantity >= product.stock ? "disabled" : ""}>+</button>
-          </div>
-
-          <button class="remove-item" data-remove="${escapeHTML(id)}">
-            Remove
-          </button>
-        </div>
-      `;
-    }).join("");
-  }
-
-  function addToCart(id) {
-    const product = getProduct(id);
-    if (!product) return;
-
-    const currentQuantity = getCartQuantity(id);
-
-    if (currentQuantity >= Number(product.stock)) {
-      alert("You cannot add more than the available stock.");
-      return;
-    }
-
-    cart[id] = currentQuantity + 1;
-    saveCart();
-    renderCart();
-  }
-
-  function changeQuantity(id, delta) {
-    const product = getProduct(id);
-    if (!product) return;
-
-    const nextQuantity = getCartQuantity(id) + delta;
-
-    if (nextQuantity <= 0) {
-      delete cart[id];
-    } else if (nextQuantity <= Number(product.stock)) {
-      cart[id] = nextQuantity;
-    }
-
-    saveCart();
-    renderCart();
-  }
-
-  function removeFromCart(id) {
-    delete cart[id];
-    saveCart();
-    renderCart();
+    $("cartSubtotal").textContent = money(subtotal());
   }
 
   function openCart() {
-    cartDrawer?.classList.add("is-open");
-    drawerBackdrop?.classList.add("is-visible");
-    cartDrawer?.setAttribute("aria-hidden", "false");
+    $("cartDrawer").hidden = false;
+    $("drawerBackdrop").hidden = false;
+    document.body.style.overflow = "hidden";
+    $("cartClose").focus();
   }
 
   function closeCart() {
-    cartDrawer?.classList.remove("is-open");
-    drawerBackdrop?.classList.remove("is-visible");
-    cartDrawer?.setAttribute("aria-hidden", "true");
+    $("cartDrawer").hidden = true;
+    $("drawerBackdrop").hidden = true;
+    document.body.style.overflow = "";
+    $("cartOpen").focus();
   }
 
-  function checkout() {
-    if (checkoutError) checkoutError.textContent = "";
+  $("productGrid").addEventListener("click", event => {
+    const button = event.target.closest("[data-add]");
+    if (!button) return;
 
-    const items = Object.entries(cart)
-      .filter(([id, quantity]) => getProduct(id) && quantity > 0);
+    const p = getProduct(button.dataset.add);
+    if (!p || p.stock < 1) return;
 
-    if (!items.length) {
-      if (checkoutError) checkoutError.textContent = "Your cart is empty.";
+    if ((cart[p.id] || 0) >= p.stock) {
+      alert("The maximum available quantity is already in your bag.");
       return;
     }
 
-    const name = customerName?.value.trim() || "";
-    const phone = customerPhone?.value.trim() || "";
-    const address = customerAddress?.value.trim() || "";
+    cart[p.id] = (cart[p.id] || 0) + 1;
+    saveCart();
+    renderCart();
 
-    if (!name || !phone || !address) {
-      if (checkoutError) {
-        checkoutError.textContent =
-          "Enter your name, phone number and delivery address.";
-      }
+    const oldText = button.textContent;
+    button.textContent = "Added ✓";
+    setTimeout(() => {
+      if (button.isConnected) button.textContent = oldText;
+    }, 1000);
+  });
+
+  $("cartItems").addEventListener("click", event => {
+    const remove = event.target.closest("[data-remove]");
+    const quantityButton = event.target.closest("[data-qty]");
+
+    if (remove) {
+      delete cart[remove.dataset.remove];
+    } else if (quantityButton) {
+      const id = quantityButton.dataset.qty;
+      const next = (cart[id] || 0) + Number(quantityButton.dataset.delta);
+      const p = getProduct(id);
+
+      if (next <= 0) delete cart[id];
+      else if (p && next <= p.stock) cart[id] = next;
+    } else {
       return;
     }
 
-    const orderLines = items.map(([id, quantity]) => {
-      const product = getProduct(id);
-      return `${product.title} x ${quantity} = ${money(product.price * quantity)}`;
-    });
+    saveCart();
+    renderCart();
+  });
+
+  $("cartOpen").addEventListener("click", openCart);
+  $("cartClose").addEventListener("click", closeCart);
+  $("drawerBackdrop").addEventListener("click", closeCart);
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !$("cartDrawer").hidden) closeCart();
+  });
+
+  ["searchInput", "categoryFilter", "sortFilter"].forEach(id => {
+    $(id).addEventListener(
+      id === "searchInput" ? "input" : "change",
+      renderProducts
+    );
+  });
+
+  // Generate genre choices directly from the catalog.
+  [...new Set(products.map(p => p.category))].sort().forEach(category => {
+    const option = document.createElement("option");
+    option.value = category;
+    option.textContent = category;
+    $("categoryFilter").appendChild(option);
+  });
+
+  $("checkoutForm").addEventListener("submit", event => {
+    event.preventDefault();
+    $("checkoutError").textContent = "";
+
+    const entries = Object.entries(cart).filter(([id, n]) =>
+      getProduct(id) && n > 0
+    );
+
+    if (!entries.length) {
+      $("checkoutError").textContent = "Your bag is empty.";
+      return;
+    }
+
+    const name = $("customerName").value.trim();
+    const phone = $("customerPhone").value.trim();
+    const address = $("customerAddress").value.trim();
+    const digits = phone.replace(/\D/g, "");
+
+    if (!name || !address || digits.length < 10 || digits.length > 15) {
+      $("checkoutError").textContent =
+        "Enter your name, full address and a valid phone number.";
+      return;
+    }
+
+    const number = String(config.whatsappNumber || "").replace(/\D/g, "");
+
+    if (!number || number.includes("XXXXXXXXXX") || number.length < 10) {
+      $("checkoutError").textContent =
+        "Set your real WhatsApp number in config.js first.";
+      return;
+    }
+
+    const lines = entries.map(([id, n]) => {
+      const p = getProduct(id);
+      return `- ${p.title} x ${n} = ${money(p.price * n)}`;
+    }).join("\n");
 
     const message = [
-      `New order request — ${config.storeName || "OtakuShelf"}`,
+      `${config.storeName || "OtakuShelf"} — ORDER REQUEST`,
       "",
       `Customer: ${name}`,
       `Phone: ${phone}`,
       `Address: ${address}`,
-      `Payment preference: ${paymentMethod?.value || "Not selected"}`,
       "",
       "Items:",
-      ...orderLines,
+      lines,
       "",
-      `Subtotal: ${money(getCartTotal())}`,
+      `Subtotal (shipping excluded): ${money(subtotal())}`,
+      `Preferred payment: ${$("paymentMethod").value}`,
       "",
-      "Please confirm stock, delivery charges and final total."
+      "Please confirm stock, shipping cost, final total and payment instructions."
     ].join("\n");
 
-    const whatsappNumber = String(config.whatsappNumber || "")
-      .replace(/\D/g, "");
+    const whatsappURL =
+      `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 
-    if (!whatsappNumber || whatsappNumber.endsWith("XXXXXXXXXX")) {
-      if (checkoutError) {
-        checkoutError.textContent =
-          "Store owner: configure your WhatsApp number in products.js first.";
-      }
-      return;
-    }
+    const opened = window.open(whatsappURL, "_blank");
 
-    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-
-  // Product-grid event delegation
-  productGrid?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-add]");
-    if (button) addToCart(button.dataset.add);
-  });
-
-  cartItems?.addEventListener("click", (event) => {
-    const changeButton = event.target.closest("[data-change]");
-    const removeButton = event.target.closest("[data-remove]");
-
-    if (changeButton) {
-      changeQuantity(
-        changeButton.dataset.change,
-        Number(changeButton.dataset.delta)
-      );
-    }
-
-    if (removeButton) {
-      removeFromCart(removeButton.dataset.remove);
+    if (!opened) {
+      $("checkoutError").textContent =
+        "WhatsApp could not open automatically. Allow pop-ups or open WhatsApp and try again.";
     }
   });
 
-  searchInput?.addEventListener("input", renderProducts);
-  categoryFilter?.addEventListener("change", renderProducts);
-  sortFilter?.addEventListener("change", renderProducts);
+  $("year").textContent = new Date().getFullYear();
 
-  cartOpen?.addEventListener("click", openCart);
-  cartClose?.addEventListener("click", closeCart);
-  drawerBackdrop?.addEventListener("click", closeCart);
-  checkoutButton?.addEventListener("click", checkout);
-
-  const year = $("year");
-  if (year) year.textContent = new Date().getFullYear();
-
-  populateGenres();
   renderProducts();
   renderCart();
-});
-      
+  loadCovers();
+})();
