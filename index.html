@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OtakuShelf | Anime & Manga Store</title>
+  <meta name="description" content="Shop manga, anime books, light novels and art books.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="announcement">
+    📚 Discover your next manga adventure!
+  </div>
+
+  <header class="header">
+    <a href="#" class="logo">O<span>takuShelf</span></a>
+    <button id="cartOpen" class="cart-button">
+      🛒 Cart (<span id="cartCount">0</span>)
+    </button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">YOUR NEXT CHAPTER STARTS HERE</p>
+      <h1>Enter a world<br>between <span>the pages.</span></h1>
+      <p>Discover manga, light novels and graphic stories.</p>
+      <a href="#shop" class="primary-button">Explore Collection ↗</a>
+    </section>
+
+    <section id="shop" class="shop">
+      <h2>Find Your Next Favourite</h2>
+      <p class="muted">Browse our collection.</p>
+
+      <div class="toolbar">
+        <input id="searchInput" placeholder="Search books..." type="search">
+        <select id="categoryFilter">
+          <option value="all">All categories</option>
+          <option value="Manga">Manga</option>
+          <option value="Light Novels">Light Novels</option>
+          <option value="Art Books">Art Books</option>
+          <option value="Comics">Comics</option>
+        </select>
+        <select id="sortFilter">
+          <option value="featured">Featured</option>
+          <option value="low">Price: Low to High</option>
+          <option value="high">Price: High to Low</option>
+        </select>
+      </div>
+
+      <div id="productGrid" class="product-grid"></div>
+      <p id="emptyState" hidden>No matching products found.</p>
+    </section>
+  </main>
+
+  <footer>
+    <h2>OtakuShelf</h2>
+    <p>Manga • Books • Stories</p>
+    <p>© <span id="year"></span> OtakuShelf</p>
+  </footer>
+
+  <div id="drawerBackdrop" class="backdrop" hidden></div>
+
+  <aside id="cartDrawer" class="cart-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <h2>Your Cart</h2>
+      <button id="cartClose">✕</button>
+    </div>
+
+    <div id="cartItems"></div>
+    <h3>Subtotal: <span id="cartSubtotal">₹0</span></h3>
+
+    <label for="customerName">Your name</label>
+    <input id="customerName" placeholder="Full name">
+
+    <label for="customerPhone">Phone number</label>
+    <input id="customerPhone" type="tel" placeholder="Phone / WhatsApp">
+
+    <label for="customerAddress">Delivery address</label>
+    <textarea id="customerAddress" placeholder="Full delivery address"></textarea>
+
+    <label for="paymentMethod">Preferred payment method</label>
+    <select id="paymentMethod">
+      <option>Cash on Delivery (if available)</option>
+      <option>UPI (confirm with seller)</option>
+      <option>Other payment method</option>
+    </select>
+
+    <button id="checkoutButton" class="primary-button">
+      Place Order on WhatsApp
+    </button>
+    <p id="checkoutError" class="error"></p>
+    <p class="muted small">
+      This sends an order request. It does not process payment.
+    </p>
+  </aside>
+
+  <script src="products.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
